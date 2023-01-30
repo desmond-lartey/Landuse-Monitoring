@@ -177,6 +177,7 @@ print(testConfusionMatrix.producersAccuracy())
 print(testConfusionMatrix.consumersAccuracy())
 print(testConfusionMatrix.kappa())
 
+// identify area do each of the classes
 
 var vegetation = classified.eq(3);
 var areaImage = vegetation.multiply(ee.Image.pixelArea());
@@ -192,8 +193,7 @@ var area = areaImage.reduceRegion({
 
 var vegetationAreaSqKm = ee.Number(area.get('classification')).divide(1e6).round();
 
-// Exercise
-// Compute and Print the percentage green cover of the city
+// Compute and Print the percentage of green cover of the city
 
 var cityAreaSqKm = geometry.area()
 var areaPercent = (vegetationAreaSqKm.divide(cityAreaSqKm)).multiply(100).round();
