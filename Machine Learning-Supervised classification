@@ -1,5 +1,5 @@
 var s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED');
-var urbanAreas = ee.FeatureCollection('users/ujavalgandhi/e2e/ne_10m_urban_areas');
+var urbanAreas = ee.FeatureCollection('projects/ee-desmond/assets/ne_10m_urban_areas');
 var alos = ee.Image('JAXA/ALOS/AW3D30/V2_2');
 //Map.addLayer(urbanAreas)
 
