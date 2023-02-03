@@ -1,3 +1,8 @@
+/*
+Copyright (c) 2022 Desmond Lartey.
+This work is licensed under the terms of the MIT license.  
+For a copy, see https://opensource.org/licenses/MIT
+*/
 var s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED');
 var urbanAreas = ee.FeatureCollection('projects/ee-desmond/assets/ne_10m_urban_areas');
 var alos = ee.Image('JAXA/ALOS/AW3D30/V2_2');
