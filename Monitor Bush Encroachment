@@ -1,0 +1,259 @@
+//This script uses Randome Forest Machine Learning Algorithm for monitoring Bush Encroachment
+//for selected African Landscapes
+
+/*
+Copyright (c) 2022 Desmond Lartey.
+This work is licensed under the terms of the MIT license.  
+For a copy, see https://opensource.org/licenses/MIT
+*/
+
+var samples = gcps;
+Map.centerObject(AOI)
+//Map.addLayer(AOI)
+
+function maskL457sr(image) {
+  // Bit 0 - Fill
+  // Bit 1 - Dilated Cloud
+  // Bit 2 - Unused
+  // Bit 3 - Cloud
+  // Bit 4 - Cloud Shadow
+  var qaMask = image.select('QA_PIXEL').bitwiseAnd(parseInt('11111', 2)).eq(0);
+  var saturationMask = image.select('QA_RADSAT').eq(0);
+
+  // Apply the scaling factors to the appropriate bands.
+  var opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2);
+  var thermalBand = image.select('ST_B6').multiply(0.00341802).add(149.0);
+
+  // Replace the original bands with the scaled ones and apply the masks.
+  return image.addBands(opticalBands, null, true)
+      .addBands(thermalBand, null, true)
+      .updateMask(qaMask)
+      .updateMask(saturationMask);
+}
+
+function maskL8sr(image) {
+  // Bit 0 - Fill
+  // Bit 1 - Dilated Cloud
+  // Bit 2 - Cirrus
+  // Bit 3 - Cloud
+  // Bit 4 - Cloud Shadow
+  var qaMask = image.select('QA_PIXEL').bitwiseAnd(parseInt('11111', 2)).eq(0);
+  var saturationMask = image.select('QA_RADSAT').eq(0);
+
+  // Apply the scaling factors to the appropriate bands.
+  var opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2);
+  var thermalBands = image.select('ST_B.*').multiply(0.00341802).add(149.0);
+
+  // Replace the original bands with the scaled ones and apply the masks.
+  return image.addBands(opticalBands, null, true)
+      .addBands(thermalBands, null, true)
+      .updateMask(qaMask)
+      .updateMask(saturationMask);
+}
+
+// Observation Year 
+
+var startyear = 1988; 
+var endyear = 2021; 
+
+
+ 
+var years = ee.List.sequence(startyear, endyear);
+
+function applyScaleFactors(image) {
+  var opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2);
+  var thermalBand = image.select('ST_B6').multiply(0.00341802).add(149.0);
+  return image.addBands(opticalBands, null, true)
+              .addBands(thermalBand, null, true);
+}
+
+function applyScaleFactorsL8(image) {
+  var opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2);
+  var thermalBands = image.select('ST_B.*').multiply(0.00341802).add(149.0);
+  return image.addBands(opticalBands, null, true)
+              .addBands(thermalBands, null, true);
+}
+
+var l5Bands = ['SR_B1','SR_B2','SR_B3','SR_B4','SR_B5','SR_B7'];
+var l5names = ['blue','green','red','nir','swir1','swir2'];
+
+var l7Bands = ['SR_B1','SR_B2','SR_B3','SR_B4','SR_B5','SR_B7'];
+var l7names = ['blue','green','red','nir','swir1','swir2'];
+
+var l8Bands = ['SR_B2','SR_B3','SR_B4','SR_B5','SR_B6','SR_B7'];
+var l8names = ['blue','green','red','nir','swir1','swir2'];
+
+// Filtering satellite imagery 
+var L8 = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')
+.filterMetadata('CLOUD_COVER','less_than', 20)
+.filterDate('2012-1-1','2021-12-31')
+.filterBounds(AOI)
+.map(maskL8sr)
+.map(applyScaleFactorsL8)
+.select(l8Bands,l8names)
+
+var L7= ee.ImageCollection("LANDSAT/LE07/C02/T1_L2")
+.filterDate('2000-1-1','2014-12-30')
+.filterMetadata('CLOUD_COVER','less_than', 20)
+.filterBounds(AOI)
+.map(maskL457sr)
+.map(applyScaleFactors)
+.select(l7Bands,l7names)
+
+var L5 = ee.ImageCollection("LANDSAT/LT05/C02/T1_L2")
+.filterDate('1988-1-1','2015-12-31')
+.filterMetadata('CLOUD_COVER','less_than', 30)
+.filterBounds(AOI)
+.map(maskL457sr)
+.map(applyScaleFactors)
+.select(l5Bands,l5names)
+
+var full_coll = L8.merge(L7).merge(L5)
+print(full_coll,'full')
+
+// Annual Collection 
+var anual_collection = ee.ImageCollection.fromImages(years.map(function (y) {
+    var anual = full_coll.filter(ee.Filter.calendarRange(y, y, 'year'))
+                    .median().clip(AOI);
+    return anual.set('year',y)
+  }));
+
+print(anual_collection,'annual')
+
+var viz = {min:0,max:0.3,bands:"red,green,blue"};
+var img_2021 = (anual_collection.filter(ee.Filter.eq('year',2021))).first()//.mosaic()
+Map.addLayer(img_2021,viz,"Landsat 2021",false);
+print(img_2021,'2021')
+var img_2011 = (anual_collection.filter(ee.Filter.eq('year',2011))).first()//.mosaic()
+Map.addLayer(img_2011,viz,"Landsat 2011",false);
+
+var img_2001= (anual_collection.filter(ee.Filter.eq('year',2001))).first()//.mosaic()
+Map.addLayer(img_2001,viz,"Landsat 2001",false);
+
+var img_1988= (anual_collection.filter(ee.Filter.eq('year',1988))).first()//.mosaic()
+Map.addLayer(img_1988,viz,"Landsat 1988");
+print(img_1988,'1988')
+
+
+
+
+
+var samples = gcps
+print(samples)
+var predictionBands = ['blue','green','red','nir','swir1','swir2'];
+
+var TrainingImage_L5 = img_1988.select(predictionBands).float(); 
+var TrainingImage_L7 = img_2001.select(predictionBands).float();
+var TrainingImage_L8 = img_2021.select(predictionBands).float();  
+  
+var classifierTraining_L5 = TrainingImage_L5.select(predictionBands).sampleRegions({collection: samples, properties: ['class'], scale: 30 });
+var classifierTraining_L7 = TrainingImage_L7.select(predictionBands).sampleRegions({collection: samples, properties: ['class'], scale: 30 });
+var classifierTraining_L8 = TrainingImage_L8.select(predictionBands).sampleRegions({collection: samples, properties: ['class'], scale: 30 });
+
+var classifierTraining = classifierTraining_L5.merge(classifierTraining_L7).merge(classifierTraining_L8)
+
+var withRandom = classifierTraining.randomColumn('random');
+
+var split = 0.7;  // Roughly 70% training, 30% testing.
+var trainingPartition = withRandom.filter(ee.Filter.lt('random', split));
+var testingPartition = withRandom.filter(ee.Filter.gte('random', split));
+
+var RF = ee.Classifier.smileRandomForest(100).train({features:trainingPartition, classProperty:'class', inputProperties: predictionBands});
+  
+print('RF train error matrix: ', RF.confusionMatrix());
+print('RF train accuracy: ', RF.confusionMatrix().accuracy());
+print('RF train Kappa: ', RF.confusionMatrix().kappa());
+
+var test = testingPartition.classify(RF);
+
+var testAccuracy = test.errorMatrix('class', 'classification');
+print('RF test error matrix: ', testAccuracy);  
+print('RF test accuracy: ', testAccuracy.accuracy());
+print('RF test Kappa: ', testAccuracy.kappa());
+
+
+var LULC = anual_collection.map(function(image){
+  var classified_RF = image.select(predictionBands).classify(RF);
+  return classified_RF.copyProperties(image, ['year']);
+})
+
+
+
+var classfied_image_2021 = LULC.filter(ee.Filter.eq('year',2021)).first()
+Map.addLayer(classfied_image_2021, {min: 0, max: 5,
+  palette: ['blue' //water
+    ,'darkgreen' //DryForest_WoodySavannah
+    ,'pink'      // ForestIsland_riparianForest
+    ,'yellow'   //Shrub_Savannah
+    ,'orange' // Grassy_Savannah
+    ,'red']}, // Bareland_builtup
+ 'Random_Forest 2021'); 
+
+
+var classfied_image_1988 = LULC.filter(ee.Filter.eq('year',1988)).first()
+Map.addLayer(classfied_image_1988, {min: 0, max: 5,
+  palette: ['blue' //water
+    ,'darkgreen' //DryForest_WoodySavannah
+    ,'pink'      // ForestIsland_riparianForest
+    ,'yellow'   //Shrub_Savannah
+    ,'orange' // Grassy_Savannah
+    ,'red']}, // Bareland_builtup
+ 'Random_Forest 1988'); 
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+var list_year = ['1988','1990','1991','1992','1993','1994','1995','1996','1997','1998','1999',
+                 '2000','2001','2002','2003','2004','2005','2006','2007','2008','2009',
+                 '2010','2011','2012','2013','2014','2015','2016','2017','2018','2019',
+                 '2020','2021']
+
+ 
+var n = LULC.size().getInfo();
+
+
+    
+    
+    
+//--------------- LULC ------------------------------------------------------    
+var colList = LULC.toList(n);
+    
+    
+for (var i = 0; i < n; i++) {
+      var img = ee.Image(colList.get(i));
+      
+      var img_id = list_year[i]
+
+      Export.image.toDrive({
+        image: img,
+        description: 'LULC_' + img_id,
+        folder: 'LULC',
+        fileNamePrefix: 'LULC_' + img_id,
+        region: AOI,
+        scale: 30,
+        maxPixels: 1e13})
+}
+
+
+var difference1988_2021 = classfied_image_1988.subtract(classfied_image_2021)
+difference1988_2021 = difference1988_2021 .neq(0)
+
+Map.addLayer(difference1988_2021, {min: 0, max: 1,
+  palette: ['white'
+    ,'red' ]}, 
+ 'difference 1988-2021'); 
+ 
+ 
+Export.image.toDrive({
+    image: difference1988_2021, 
+    description: "difference1988_2021", 
+    region: AOI, 
+    scale: 30 ,
+    maxPixels: 1e13}) 
+    
+    
